@@ -14,9 +14,13 @@ Because Companion's module sandbox does not allow spawning child processes, the 
 
 ## First-time setup
 
-### 1. Install the AudioSidecar service
+### 1. Download the module
 
-Open **PowerShell as Administrator** and run:
+Download the latest `companion-windows-audio-x.x.x.tgz` from the [Releases page](https://github.com/mehistaken/companion-windows-audio/releases).
+
+### 2. Install the AudioSidecar service
+
+The `.tgz` includes `AudioSidecar.exe` and the service scripts. From the directory where Companion extracted the module, open **PowerShell as Administrator** and run:
 
 ```powershell
 .\install-service.ps1
@@ -36,7 +40,7 @@ To uninstall:
 .\uninstall-service.ps1
 ```
 
-### 2. Add the connection in Companion
+### 3. Add the connection in Companion
 
 - Open the Companion web interface
 - Go to **Connections** → **Add connection**

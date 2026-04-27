@@ -14,9 +14,15 @@ The module communicates with a small background process called **AudioSidecar** 
 
 ## Quick start
 
-### 1. Install the AudioSidecar service
+### 1. Download and install the module
 
-Open **PowerShell as Administrator** and run:
+Download the latest `companion-windows-audio-x.x.x.tgz` from the [Releases page](https://github.com/mehistaken/companion-windows-audio/releases).
+
+In Companion go to **Connections → Add connection → (import icon) → Import from file** and select the `.tgz`.
+
+### 2. Install the AudioSidecar service
+
+From the directory where Companion extracted the module, open **PowerShell as Administrator** and run:
 
 ```powershell
 .\install-service.ps1
@@ -28,7 +34,7 @@ The service starts automatically and restarts on every reboot. To uninstall:
 .\uninstall-service.ps1
 ```
 
-### 2. Add the module in Companion
+### 3. Add the connection in Companion
 
 - Go to **Connections → Add connection**
 - Search for **Windows Audio Control**

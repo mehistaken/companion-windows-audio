@@ -7,9 +7,10 @@ DEBUG-*
 /.yarn
 /.vscode
 
-# AudioSidecar build output — only the final exe belongs in resources/
+# AudioSidecar build output — binaries are distributed via GitHub Releases
 AudioSidecar/bin/
 AudioSidecar/obj/
+/resources/*.exe
 /resources/*.pdb
 /resources/*.dll
 /resources/*.json
