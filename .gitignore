@@ -1,0 +1,18 @@
+node_modules/
+package-lock.json
+/pkg
+/*.tgz
+/dist
+DEBUG-*
+/.yarn
+/.vscode
+
+# AudioSidecar build output — only the final exe belongs in resources/
+AudioSidecar/bin/
+AudioSidecar/obj/
+/resources/*.pdb
+/resources/*.dll
+/resources/*.json
+/resources/createdump.exe
+/resources/[a-z][a-z]/
+/resources/[a-z][a-z]-*/
