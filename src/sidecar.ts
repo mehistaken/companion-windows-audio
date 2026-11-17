@@ -8,6 +8,7 @@ export interface SidecarEventHandlers {
 	onVolumeChanged: (id: string, volume: number, muted: boolean) => void
 	onDeviceAdded: (device: DeviceState) => void
 	onDeviceRemoved: (id: string) => void
+	onLevels: (levels: Record<string, [number, number]>) => void
 }
 
 export class SidecarClient {
@@ -85,6 +86,9 @@ export class SidecarClient {
 				break
 			case 'device_removed':
 				this.handlers.onDeviceRemoved(msg.id)
+				break
+			case 'levels':
+				this.handlers.onLevels(msg.levels)
 				break
 			case 'error':
 				this.log('warn', `Sidecar error: ${msg.message}`)

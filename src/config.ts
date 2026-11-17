@@ -4,6 +4,7 @@ export type ModuleConfig = {
 	port: number
 	autoStart: boolean
 	pollInterval: number
+	meterFps: number
 }
 
 export function GetConfigFields(): SomeCompanionConfigField[] {
@@ -32,6 +33,17 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			min: 500,
 			max: 30000,
 			default: 2000,
+		},
+		{
+			type: 'number',
+			id: 'meterFps',
+			label: 'Peak level refresh rate (updates/sec)',
+			tooltip:
+				'Only used while a Peak Level feedback is on a button. Higher values look smoother but load Companion more.',
+			width: 4,
+			min: 5,
+			max: 30,
+			default: 15,
 		},
 	]
 }

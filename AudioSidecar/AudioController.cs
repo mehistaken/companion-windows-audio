@@ -107,6 +107,33 @@ public sealed class AudioController : IMMNotificationClient, IDisposable
         }
     }
 
+    // ─── Metering ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Reads the current peak level (0.0–1.0) of every device as [left, right],
+    /// using the endpoint's own meter. This needs no audio capture and works when
+    /// running as a Windows Service. (Per-app session meters are not visible from
+    /// the service's session, so they can't be used here.)
+    /// </summary>
+    public Dictionary<string, float[]> GetPeaks()
+    {
+        var result = new Dictionary<string, float[]>();
+        foreach (var (id, dev) in _mmDevices)
+        {
+            try { result[id] = ReadMeter(dev.AudioMeterInformation); }
+            catch { /* device may have gone away mid-read */ }
+        }
+        return result;
+    }
+
+    private static float[] ReadMeter(AudioMeterInformation meter)
+    {
+        var channels = meter.PeakValues.Count;
+        return channels >= 2
+            ? [meter.PeakValues[0], meter.PeakValues[1]]
+            : [meter.MasterPeakValue, meter.MasterPeakValue];
+    }
+
     // ─── Enumeration ─────────────────────────────────────────────────────────
 
     private void Enumerate()

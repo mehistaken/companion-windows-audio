@@ -57,6 +57,7 @@ The module will connect to the sidecar automatically. Once connected the status 
 |---|---|---|
 | **Sidecar Port** | `37891` | Local TCP port the sidecar listens on. Only change this if something else is using port 37891, and re-run `install-service.ps1 -Port <new>` to match. |
 | **Reconnect retry ms** | `2000` | How often the module retries if the connection drops. |
+| **Peak level refresh rate** | `15` | Updates per second for Peak Level feedbacks (5–30). Only active while a Peak Level feedback is in use. |
 
 ---
 
@@ -98,7 +99,7 @@ Makes a device the Windows default playback device.
 
 ## Feedbacks
 
-All feedbacks are **boolean** — they change button appearance when their condition is true.
+These feedbacks are **boolean**: they change button appearance when their condition is true.
 
 | Feedback | Default style | Triggers when… |
 |---|---|---|
@@ -106,6 +107,26 @@ All feedbacks are **boolean** — they change button appearance when their condi
 | **Volume Above Threshold** | Green background | Device volume ≥ threshold |
 | **Volume Below Threshold** | Orange background | Device volume ≤ threshold |
 | **Is Default Device** | Blue background | The device is the current Windows default playback device |
+
+### Peak Level (value feedback)
+
+Reports a device's live output level as a number from 0 to 100. It is designed to drive Companion's **Gauge** element (Companion 5.0+), giving you a level meter you can style however you like.
+
+| Option | Default | Description |
+|---|---|---|
+| Device | — | The playback device to meter |
+| Channel | Loudest of L/R | `Left`, `Right`, or the louder of the two. For a stereo meter, use two gauges with two feedbacks |
+| Scale | dB | dB matches how loudness is heard; linear rises much later |
+| Floor | `-60` dB | Level that reads 0. Anything quieter reads 0. Raise it (e.g. `-40`) to hide faint background signal |
+| Ceiling | `0` dB | Level that reads 100. Anything louder reads 100. Lower it (e.g. `-10`) so quieter sources fill the gauge |
+
+**Setting up a meter button:**
+
+1. In the button's **Style** tab, add a **Gauge** element. Set its range to 0–100 and style it (orientation, colour stops, track, opacity).
+2. In **Feedbacks**, add **Peak Level** and choose the device.
+3. On the feedback, add an override for the gauge's **Value** and leave it as `$(this:value)`.
+
+The level is the signal going into the device, before the device's own volume, so turning the device down doesn't shrink it. Levels are read directly from Windows with no audio capture, and fall away smoothly after peaks. Audio muted in the Windows Volume Mixer or inside an app (e.g. a muted browser tab) can still leave a faint signal; raise the floor to hide it. Metering only runs while at least one Peak Level feedback is in use.
 
 ---
 
@@ -155,7 +176,6 @@ Ready-made button presets are generated automatically for each connected device,
 - **Vol Up** — Adjust Volume +1 with acceleration
 - **Vol Down** — Adjust Volume −1 with acceleration
 - **Toggle Mute** — Turns red when the device is muted
-
 Find them under **Buttons → Presets → Windows Audio Control**.
 
 ---
@@ -185,7 +205,7 @@ Open Event Viewer → Windows Logs → Application and look for entries from `Au
 - Listens **only** on `127.0.0.1` (localhost) — it is not accessible from the network
 - Has no network access beyond that single local port
 - Makes no registry changes beyond what the Windows Service Control Manager records during install
-- Source code is available at: *(link to your repository)*
+- Source code is available at: https://github.com/mehistaken/companion-windows-audio
 
 **VirusTotal scan:** [Results](https://www.virustotal.com/gui/file/9ba2364b60fd3df08571a1a90281eb04c238b6fca9a2432e0a289b312d395ac0)
 

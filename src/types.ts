@@ -34,11 +34,18 @@ export type ErrorMessage = {
 	message: string
 }
 
+/** Peak levels per device id, as [left, right] linear 0.0–1.0 */
+export type LevelsMessage = {
+	type: 'levels'
+	levels: Record<string, [number, number]>
+}
+
 export type SidecarMessage =
 	| SnapshotMessage
 	| VolumeChangedMessage
 	| DeviceAddedMessage
 	| DeviceRemovedMessage
+	| LevelsMessage
 	| ErrorMessage
 
 // Client → Sidecar commands
@@ -47,6 +54,7 @@ export type SetMuteCommand = { cmd: 'set_mute'; id: string; muted: boolean }
 export type ToggleMuteCommand = { cmd: 'toggle_mute'; id: string }
 export type SetDefaultCommand = { cmd: 'set_default'; id: string }
 export type ListDevicesCommand = { cmd: 'list_devices' }
+export type MeterCommand = { cmd: 'meter'; enabled: boolean; interval?: number }
 
 export type SidecarCommand =
 	| SetVolumeCommand
@@ -54,6 +62,7 @@ export type SidecarCommand =
 	| ToggleMuteCommand
 	| SetDefaultCommand
 	| ListDevicesCommand
+	| MeterCommand
 
 export function slugify(name: string): string {
 	return name

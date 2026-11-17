@@ -5,7 +5,7 @@
 	"name": "Windows Audio Control",
 	"shortname": "WinAudio",
 	"description": "Control Windows audio device volumes and mute states via WASAPI, including virtual devices like SteelSeries Sonar and Voicemeeter.",
-	"version": "0.1.0",
+	"version": "0.3.0",
 	"license": "MIT",
 	"repository": "git+https://github.com/mehistaken/companion-windows-audio.git",
 	"bugs": "https://github.com/mehistaken/companion-windows-audio/issues",
@@ -22,7 +22,7 @@
 		"entrypoint": "../dist/main.js"
 	},
 	"legacyIds": [],
-	"manufacturer": "Adam Chan",
-	"products": ["Windows Audio Control"],
+	"manufacturer": "Microsoft",
+	"products": ["Windows Audio"],
 	"keywords": ["audio", "volume", "mute", "windows", "wasapi", "sonar", "voicemeeter"]
 }

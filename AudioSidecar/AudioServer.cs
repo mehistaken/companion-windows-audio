@@ -22,6 +22,8 @@ public sealed class AudioServer : IDisposable
     private readonly AudioController _controller;
     private readonly TcpListener _listener;
     private readonly ConcurrentDictionary<int, TcpClient> _clients = new();
+    // client id → requested meter interval (ms). Metering only runs while this is non-empty.
+    private readonly ConcurrentDictionary<int, int> _meterSubs = new();
     private readonly object _broadcastLock = new();
     private int _nextClientId;
     private bool _disposed;
@@ -60,6 +62,44 @@ public sealed class AudioServer : IDisposable
                 }
             }
         }, ct);
+
+        Task.Run(() => MeterLoopAsync(ct), ct);
+    }
+
+    // ─── Metering ─────────────────────────────────────────────────────────────
+
+    private async Task MeterLoopAsync(CancellationToken ct)
+    {
+        var sw = new System.Diagnostics.Stopwatch();
+        while (!ct.IsCancellationRequested)
+        {
+            int wait;
+            if (_meterSubs.IsEmpty)
+            {
+                wait = 200; // idle: just check for subscribers occasionally
+            }
+            else
+            {
+                var interval = _meterSubs.Values.Min();
+                sw.Restart();
+                try
+                {
+                    var levels = _controller.GetPeaks().ToDictionary(
+                        kv => kv.Key,
+                        kv => new[] { MathF.Round(kv.Value[0], 3), MathF.Round(kv.Value[1], 3) });
+                    var json = JsonSerializer.Serialize(new { type = "levels", levels }, JsonOpts);
+                    BroadcastLine(json, _meterSubs.Keys.ToHashSet());
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[server] Meter error: {ex.Message}");
+                }
+                wait = Math.Max(1, interval - (int)sw.ElapsedMilliseconds);
+            }
+
+            try { await Task.Delay(wait, ct); }
+            catch (OperationCanceledException) { break; }
+        }
     }
 
     private async Task HandleClientAsync(int id, TcpClient client, CancellationToken ct)
@@ -94,7 +134,7 @@ public sealed class AudioServer : IDisposable
                     var line = accumulated[..newlinePos].Trim();
                     accumulated = accumulated[(newlinePos + 1)..];
                     if (line.Length > 0)
-                        await ProcessCommandAsync(stream, line, ct);
+                        await ProcessCommandAsync(id, stream, line, ct);
                 }
 
                 lineBuffer.Clear();
@@ -108,12 +148,13 @@ public sealed class AudioServer : IDisposable
         finally
         {
             _clients.TryRemove(id, out _);
+            _meterSubs.TryRemove(id, out _);
             client.Dispose();
             Console.WriteLine($"[server] Client {id} disconnected");
         }
     }
 
-    private async Task ProcessCommandAsync(NetworkStream stream, string line, CancellationToken ct)
+    private async Task ProcessCommandAsync(int clientId, NetworkStream stream, string line, CancellationToken ct)
     {
         JsonDocument doc;
         try { doc = JsonDocument.Parse(line); }
@@ -166,6 +207,22 @@ public sealed class AudioServer : IDisposable
                         await SendErrorAsync(stream, "set_default requires 'id'", ct);
                     break;
 
+                case "meter":
+                {
+                    var enabled = doc.RootElement.TryGetProperty("enabled", out var enProp) && enProp.GetBoolean();
+                    if (enabled)
+                    {
+                        var interval = doc.RootElement.TryGetProperty("interval", out var intProp)
+                            ? intProp.GetInt32() : 66;
+                        _meterSubs[clientId] = Math.Clamp(interval, 30, 1000);
+                    }
+                    else
+                    {
+                        _meterSubs.TryRemove(clientId, out _);
+                    }
+                    break;
+                }
+
                 default:
                     await SendErrorAsync(stream, $"Unknown command: {cmd}", ct);
                     break;
@@ -210,7 +267,7 @@ public sealed class AudioServer : IDisposable
         BroadcastLine(json);
     }
 
-    private void BroadcastLine(string json)
+    private void BroadcastLine(string json, ISet<int>? onlyClients = null)
     {
         var data = Encoding.UTF8.GetBytes(json + "\n");
         List<int> toRemove = [];
@@ -219,6 +276,7 @@ public sealed class AudioServer : IDisposable
         {
             foreach (var (id, client) in _clients)
             {
+                if (onlyClients != null && !onlyClients.Contains(id)) continue;
                 try
                 {
                     if (!client.Connected) { toRemove.Add(id); continue; }

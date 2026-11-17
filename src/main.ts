@@ -27,6 +27,13 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	devices: Map<string, DeviceState> = new Map()
 	sidecar: SidecarClient | null = null
 
+	/** Smoothed peak levels per device, [left, right] linear 0–1 */
+	levels: Map<string, [number, number]> = new Map()
+	/** Ids of Peak Level feedback instances currently on buttons */
+	meterFeedbacks: Set<string> = new Set()
+
+	private meterSubscribed = false
+	private lastLevelsAt = 0
 	private sidecarProcess: ChildProcess | null = null
 
 	constructor(internal: unknown) {
@@ -84,7 +91,48 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		UpdateVariableDefinitions(this)
 	}
 
+	/**
+	 * Ask the sidecar to stream levels only while at least one Peak Level
+	 * feedback is in use, so idle setups cost nothing.
+	 */
+	updateMeterSubscription(): void {
+		const want = this.meterFeedbacks.size > 0 && (this.sidecar?.isConnected() ?? false)
+		if (want === this.meterSubscribed) return
+		this.meterSubscribed = want
+		if (want) {
+			const fps = Math.max(5, Math.min(30, Number(this.config.meterFps) || 15))
+			this.sidecar?.sendCommand({ cmd: 'meter', enabled: true, interval: Math.round(1000 / fps) })
+		} else {
+			this.sidecar?.sendCommand({ cmd: 'meter', enabled: false })
+			this.levels.clear()
+		}
+	}
+
+	private handleLevels(levels: Record<string, [number, number]>): void {
+		const now = Date.now()
+		const dt = this.lastLevelsAt ? Math.min(500, now - this.lastLevelsAt) : 66
+		this.lastLevelsAt = now
+		// Peak fall-off: ~0.8x per 66ms frame (≈ 30 dB/s), independent of refresh rate
+		const decay = Math.pow(0.8, dt / 66)
+
+		let changed = false
+		for (const [id, [l, r]] of Object.entries(levels)) {
+			const prev = this.levels.get(id) ?? [0, 0]
+			const next: [number, number] = [Math.max(l, prev[0] * decay), Math.max(r, prev[1] * decay)]
+			if (next[0] < 0.001) next[0] = 0
+			if (next[1] < 0.001) next[1] = 0
+			if (Math.abs(next[0] - prev[0]) > 0.002 || Math.abs(next[1] - prev[1]) > 0.002) changed = true
+			this.levels.set(id, next)
+		}
+
+		// Skip redraws when nothing moved (e.g. silence)
+		if (changed) this.checkFeedbacks('peak_level')
+	}
+
 	private initSidecar(): void {
+		this.meterSubscribed = false
+		this.levels.clear()
+
 		if (this.config.autoStart) {
 			this.startSidecarProcess()
 		}
@@ -97,7 +145,12 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 					// Waiting for snapshot before setting Ok
 					this.updateStatus(InstanceStatus.Connecting)
 					this.setVariableValues({ sidecar_connected: 'true' })
+					// New socket: sidecar has no subscription for us yet
+					this.meterSubscribed = false
+					this.updateMeterSubscription()
 				},
+
+				onLevels: (levels) => this.handleLevels(levels),
 
 				onSnapshot: (devices) => {
 					this.devices = new Map(devices.map((d) => [d.id, d]))
@@ -145,6 +198,11 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 				onDisconnected: () => {
 					this.updateStatus(InstanceStatus.ConnectionFailure)
 					this.setVariableValues({ sidecar_connected: 'false' })
+					this.meterSubscribed = false
+					if (this.levels.size > 0) {
+						this.levels.clear()
+						this.checkFeedbacks('peak_level')
+					}
 				},
 			},
 			(level, msg) => this.log(level, msg),
